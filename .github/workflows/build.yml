@@ -8,7 +8,7 @@ on:
 jobs:
   build-analyze-scan:
     name: Build, Analyze, and Scan
-    runs-on: self-hosted
+    runs-on: [self-hosted, myntra]
 
     steps:
       - name: Checkout code
