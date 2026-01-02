@@ -1,26 +1,63 @@
-name: Build
+name: Build, Analyze, and Scans
 
 on:
   push:
     branches:
       - main
 
-
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
+  build-analyze-scan:
+    name: Build, Analyze, and Scan
+    runs-on: self-hosted
+
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - uses: sonarsource/sonarqube-scan-action@master
+          fetch-depth: 0
+
+      # -------------------------
+      # SonarQube Scan
+      # -------------------------
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      # If you wish to fail your job when the Quality Gate is red, uncomment the
-      # following lines. This would typically be used to fail a deployment.
-      # - uses: sonarsource/sonarqube-quality-gate-action@master
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # -------------------------
+      # NPM Install
+      # -------------------------
+      - name: Install dependencies
+        run: npm install
+
+      # -------------------------
+      # Docker Login
+      # -------------------------
+      - name: Docker Login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      # -------------------------
+      # Docker Scout (Filesystem)
+      # -------------------------
+      - name: Docker Scout FS Scan
+        run: |
+          docker-scout quickview fs://.
+          docker-scout cves fs://.
+
+      # -------------------------
+      # Docker Build & Push
+      # -------------------------
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t myntra .
+          docker tag myntra 22030083/myntra:latest
+          docker push 22030083/myntra:latest
+
+      # -------------------------
+      # Docker Scout (Image)
+      # -------------------------
+      - name: Docker Scout Image Scan
+        run: |
+          docker-scout quickview 22030083/myntra:latest
+          docker-scout cves 22030083/myntra:latest
