@@ -6,6 +6,9 @@ on:
       - main
 
 jobs:
+  # =========================
+  # BUILD + ANALYZE + SCAN
+  # =========================
   build-analyze-scan:
     name: Build, Analyze, and Scan
     runs-on: [self-hosted, myntra]
@@ -61,3 +64,26 @@ jobs:
         run: |
           docker-scout quickview 22030083/myntra:latest
           docker-scout cves 22030083/myntra:latest
+
+  # =========================
+  # DEPLOY JOB
+  # =========================
+  deploy:
+    name: Deploy Application
+    needs: build-analyze-scan
+    runs-on: [self-hosted, myntra]
+
+    steps:
+      - name: Docker pull image
+        run: docker pull 22030083/myntra:latest
+
+      - name: Deploy to container
+        run: |
+          docker rm -f game || true
+          docker run -d --name game -p 3000:3000 22030083/myntra:latest
+
+      - name: Update kubeconfig
+        run: aws eks --region ap-south-1 update-kubeconfig --name EKS_CLOUD
+
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f deployment-service.yml
